@@ -1,0 +1,348 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0d08072f-850c-46e7-b405-43de806ecb3d",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3bDdKrHmg8u0Gm71",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.snippet }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "order",
+              "description": "when any email come with the text inside  include new order it will separate it "
+            },
+            {
+              "category": "inquiry ",
+              "description": "if any email include words enquiry or customer is asking any type of question , need to separate it "
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        16
+      ],
+      "id": "5d443ec8-fdd2-4876-9ecf-c7058ffa62f9",
+      "name": "Text Classifier"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        304
+      ],
+      "id": "d7aa4c42-f906-4438-a9f6-706e6ba29d1e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "l928uszRmi8EbK5O",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a premium, friendly customer support assistant. Write a reassuring and polite email reply to this customer who has just placed an order.\n\nCustomer Email:\n\"{{ $json.snippet }}\"\n\nYou MUST return your response ONLY as a raw JSON object with exactly two keys: \"subject\" and \"email_body\". Do not include any explanation, do not include markdown code blocks like ```json, and do not put it inside an array.\n\nJSON Format:\n{\n  \"subject\": \"Write a warm, professional subject line here\",\n  \"email_body\": \"Write the complete email body here, formatted with proper line breaks (\\n).\"\n}\n\nIn your email body:\n1. Start with a warm greeting and thank them sincerely for ordering with us.\n2. Acknowledge the item/order mentioned in their email.\n3. Inform them that our fulfillment team is already processing their order.\n4. Politely mention that we will send them another update with the tracking number soon.\n5. End with a sweet customer service closing.\n6. Keep the tone friendly, enthusiastic, and premium.\n7. Sign off professionally as \"Customer Support Team\".\n"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        544,
+        -64
+      ],
+      "id": "68288c6f-c923-4dfd-9797-79025c1d5777",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "l928uszRmi8EbK5O",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "64f9bc2c-a1c7-428f-9751-88e43cf93055",
+              "name": "Subject",
+              "value": "={{ JSON.parse($json.content.parts[0].text).subject }}\n",
+              "type": "string"
+            },
+            {
+              "id": "629d7ba9-b08f-42d8-8075-f30463fccc21",
+              "name": "Email body",
+              "value": "={{ JSON.parse($json.content.parts[0].text).email_body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        -64
+      ],
+      "id": "e21b90d6-ee4b-4438-a26c-f32f22c64437",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.Subject }}",
+        "message": "={{ $json['Email body'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        -64
+      ],
+      "id": "66ad965b-c208-4856-83fa-9bc6971805d5",
+      "name": "Create a draft",
+      "webhookId": "60b53cf5-9e37-4042-923a-f38206932e83",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3bDdKrHmg8u0Gm71",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a helpful and professional customer support assistant. Write a short, helpful email reply to this customer inquiry.\n{{ $('Gmail Trigger').item.json.snippet }}\nCustomer Email:\n\"{{ $json.snippet }}\"\n\nYou MUST return your response ONLY as a raw JSON object with exactly two keys: \"subject\" and \"email_body\". Do not include any explanation, do not include markdown code blocks like ```json, and do not put it inside an array.\n\nJSON Format:\n{\n\"subject\": \"Write a clear, professional subject line here\",\n\"email_body\": \"Write the complete email body here, formatted with proper line breaks (\\n).\"\n}\n\nIn your email body:\n\nAcknowledge their question/concern politely.\n\nTell them that we have received their inquiry and our support representative is looking into it.\n\nLet them know we will get back to them with a detailed answer within 24 hours.\n\nKeep the tone helpful and professional.\n\nSign off as \"Customer Support Team\"."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        544,
+        112
+      ],
+      "id": "60b373ac-a1de-41fa-aee7-166f93b4497d",
+      "name": "Message a model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "l928uszRmi8EbK5O",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fa2ac493-560b-49cc-8e66-904d810cb3e6",
+              "name": "Subject",
+              "value": "={{ JSON.parse($json.content.parts[0].text).subject }}",
+              "type": "string"
+            },
+            {
+              "id": "5ef2e240-56c3-46bb-ac2e-f6ca9a525a9a",
+              "name": "Email body",
+              "value": "={{ JSON.parse($json.content.parts[0].text).email_body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        112
+      ],
+      "id": "bf05621f-a315-4f87-b29b-f526c2744039",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.Subject }}",
+        "message": "={{ $json['Email body'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        112
+      ],
+      "id": "3c641cda-f367-46a8-8f90-262806fb0035",
+      "name": "Create a draft1",
+      "webhookId": "cdd6478e-a0fb-427b-a988-b5dfc22c3f81",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3bDdKrHmg8u0Gm71",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Classifier": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Create a draft1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "763b5ff2-ba17-4430-9e3d-56ebaf22dd04",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "876d653768ab7d45110978df5d654f6de1524b5209b5fefeabe3944e73d0f09a"
+  },
+  "id": "hwYdX6uNEqvfgGMn",
+  "tags": []
+}
